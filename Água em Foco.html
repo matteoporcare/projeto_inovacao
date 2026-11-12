@@ -1,0 +1,423 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Água em Foco</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: barra de simulação fixa no topo; abaixo, duas vistas (celular do morador / painel do operador) alimentadas pelo mesmo estado */
+:root{
+  --bg:#eef2f5; --surface:#ffffff; --surface-2:#f6f9fa; --fg:#0e1b22; --muted:#5a6b76;
+  --line:#d2dde3; --line-strong:#b6c5cd; --accent:#0d6b8c; --accent-soft:#dbeef6;
+  --ok:#17764d; --ok-soft:#dcf0e5; --warn:#a85f00; --warn-soft:#fbebd2;
+  --crit:#ab2a20; --crit-soft:#fadfdc; --stale:#5f707a; --stale-soft:#e5ebee;
+  --font-h:'Archivo',system-ui,sans-serif; --font-b:'Inter',system-ui,sans-serif; --font-m:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b1216; --surface:#111c22; --surface-2:#16232a; --fg:#e4edf2; --muted:#93a6b1;
+  --line:#233138; --line-strong:#33454e; --accent:#51b4d6; --accent-soft:#11313e;
+  --ok:#5fcc96; --ok-soft:#0f2a20; --warn:#e2a456; --warn-soft:#2e2112; --crit:#f0837a; --crit-soft:#331714;
+  --stale:#9aacb6; --stale-soft:#1b272e; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0b1216; --surface:#111c22; --surface-2:#16232a; --fg:#e4edf2; --muted:#93a6b1;
+  --line:#233138; --line-strong:#33454e; --accent:#51b4d6; --accent-soft:#11313e;
+  --ok:#5fcc96; --ok-soft:#0f2a20; --warn:#e2a456; --warn-soft:#2e2112; --crit:#f0837a; --crit-soft:#331714;
+  --stale:#9aacb6; --stale-soft:#1b272e; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-b);line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--font-h);margin:0;text-wrap:balance;letter-spacing:-.01em}
+button{font:inherit;cursor:pointer}
+.num{font-family:var(--font-m);font-variant-numeric:tabular-nums}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1180px;margin:0 auto}
+
+/* topo */
+.sim{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--surface);border-bottom:1px solid var(--line)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:11;background:var(--surface)}
+.sim-in{padding-block:12px;display:flex;flex-wrap:wrap;gap:14px 20px;align-items:flex-end}
+.sim h1{font-size:15px;letter-spacing:.14em;text-transform:uppercase;font-weight:600}
+.sim h1 small{display:block;letter-spacing:0;text-transform:none;font-family:var(--font-b);font-size:12px;color:var(--muted);font-weight:400;margin-top:2px}
+.ctl{display:flex;flex-direction:column;gap:5px;min-width:0}
+.ctl label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+input[type=range]{accent-color:var(--accent);width:190px;max-width:52vw}
+.chip{border:1px solid var(--line-strong);background:var(--surface-2);color:var(--fg);border-radius:999px;padding:6px 13px;font-size:13px;font-weight:500}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .chip[aria-pressed="true"],
+.chip[aria-pressed="true"]{color:var(--surface)}
+.chip.danger[aria-pressed="true"]{background:var(--crit);border-color:var(--crit)}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.spacer{flex:1}
+
+/* abas de vista */
+.views{display:flex;gap:8px;padding-block:18px 10px}
+.views button{background:none;border:none;border-bottom:2px solid transparent;padding:6px 2px;margin-right:16px;color:var(--muted);font-weight:600;font-family:var(--font-h);font-size:15px}
+.views button[aria-selected="true"]{color:var(--fg);border-color:var(--accent)}
+
+/* celular */
+.stage{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap;padding-bottom:40px}
+.phone{width:330px;max-width:100%;border:1px solid var(--line-strong);border-radius:26px;background:var(--surface);overflow:hidden;box-shadow:0 18px 40px -28px rgba(8,30,40,.55);display:flex;flex-direction:column;min-height:620px}
+.ph-top{padding:12px 16px 10px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ph-top b{font-family:var(--font-h);font-size:15px}
+.ph-body{padding:14px 16px 18px;display:flex;flex-direction:column;gap:12px;flex:1;min-width:0}
+.ph-nav{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);background:var(--surface-2)}
+.ph-nav button{background:none;border:none;padding:11px 4px 13px;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.02em}
+.ph-nav button[aria-selected="true"]{color:var(--accent);box-shadow:inset 0 2px 0 var(--accent)}
+.banner{display:flex;gap:8px;font-size:11.5px;line-height:1.35;color:var(--warn);background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);border-radius:10px;padding:8px 10px}
+.state{border-radius:14px;padding:16px;border:1px solid var(--line)}
+.state .lbl{font-family:var(--font-h);font-size:21px;font-weight:700;line-height:1.15;text-transform:uppercase;letter-spacing:.01em}
+.state .val{margin-top:8px;font-size:30px;font-weight:600;font-family:var(--font-m);font-variant-numeric:tabular-nums}
+.state .sub{font-size:12.5px;color:var(--muted);margin-top:4px}
+.s-ok{background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 35%,transparent)} .s-ok .lbl{color:var(--ok)}
+.s-crit{background:var(--crit-soft);border-color:color-mix(in srgb,var(--crit) 40%,transparent)} .s-crit .lbl{color:var(--crit)}
+.s-stale{background:var(--stale-soft);border-color:var(--line-strong)} .s-stale .lbl{color:var(--stale)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:11px 13px;background:var(--surface-2);font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:7px;vertical-align:1px}
+.mini{border:1px solid var(--line);border-radius:12px;padding:8px;background:var(--surface-2)}
+.mini button{display:block;width:100%;background:none;border:none;padding:0;text-align:left}
+.hint{font-size:11.5px;color:var(--muted)}
+.seg-time{display:flex;gap:6px}
+.seg-time button{flex:1;border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:6px 0;font-size:12px;color:var(--muted);font-weight:600}
+.seg-time button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:0;border-top:2px solid var(--accent);margin-right:5px;vertical-align:4px}
+.legend i.dash{border-top-style:dashed;border-color:var(--crit)}
+.legend i.gap{height:10px;border:1px solid var(--line-strong);background:repeating-linear-gradient(45deg,transparent 0 3px,var(--line-strong) 3px 4px);vertical-align:-1px}
+.help h4{font-size:13px;margin-top:4px}
+.help p{font-size:12.5px;color:var(--muted);margin:5px 0 0}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line-strong);margin-right:5px}
+.call{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line-strong);border-radius:10px;padding:10px 12px;font-size:13px;font-weight:600;background:var(--surface-2)}
+.call .num{color:var(--accent)}
+
+/* painel do operador */
+.panel{flex:1;min-width:300px;border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden}
+.panel-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.panel-top h2{font-size:16px}
+.badge{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.panel-body{padding:18px;display:flex;flex-direction:column;gap:18px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface-2);min-width:0}
+.tile .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tile .v{font-family:var(--font-h);font-size:19px;font-weight:700;margin-top:6px}
+.tile .d{font-size:11.5px;color:var(--muted);margin-top:3px}
+.tile.alert{border-left:3px solid var(--crit)}
+.sec h3{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.alerts{display:flex;flex-direction:column;gap:10px}
+.alert-item{border:1px solid var(--line);border-left:3px solid var(--line-strong);border-radius:10px;padding:11px 13px;display:flex;gap:12px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;background:var(--surface-2)}
+.alert-item.lv-crit{border-left-color:var(--crit)}
+.alert-item.lv-stale{border-left-color:var(--stale)}
+.alert-item .t{font-weight:600;font-size:13.5px}
+.alert-item .m{font-size:12px;color:var(--muted);margin-top:3px}
+.acts{display:flex;gap:7px}
+.btn{border:1px solid var(--line-strong);background:var(--surface);color:var(--fg);border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.empty{font-size:13px;color:var(--muted);border:1px dashed var(--line-strong);border-radius:10px;padding:16px;text-align:center}
+form.cfg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+form.cfg .f{display:flex;flex-direction:column;gap:5px;min-width:0}
+form.cfg label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+input[type=number],input[type=text]{font:inherit;font-family:var(--font-m);padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--fg);width:100%;min-width:0}
+input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cfg-foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.log{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:6px;max-height:140px;overflow:auto}
+.log div{border-bottom:1px dotted var(--line);padding-bottom:5px}
+.chart-box{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:10px}
+svg{display:block;width:100%;height:auto;max-width:100%}
+.note{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-block:16px 28px}
+@media (prefers-reduced-motion:no-preference){.state,.row{transition:background .25s,border-color .25s}}
+</style>
+
+<div class="sim">
+ <div class="wrap sim-in">
+  <div><h1>Água em Foco<small>Protótipo de alta fidelidade · dados simulados</small></h1></div>
+  <div class="ctl">
+    <label for="lvl">Nível da água no ponto <span class="num" id="lvlOut">42</span> cm</label>
+    <input type="range" id="lvl" min="0" max="140" value="42">
+  </div>
+  <div class="ctl">
+    <label>Estado do sensor</label>
+    <div class="seg">
+      <button class="chip" id="bOk" aria-pressed="true">Enviando</button>
+      <button class="chip danger" id="bOff" aria-pressed="false">Sem sinal</button>
+    </div>
+  </div>
+  <div class="ctl">
+    <label>Tempo</label>
+    <div class="seg">
+      <button class="chip" id="bPlay" aria-pressed="true">Rodando</button>
+      <button class="chip" id="bStep">+5 min</button>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="ctl"><label>Tema</label><div class="seg"><button class="chip" id="bTheme">Alternar</button></div></div>
+ </div>
+</div>
+
+<div class="wrap">
+  <div class="views" role="tablist">
+    <button role="tab" id="vMor" aria-selected="true">Morador (celular)</button>
+    <button role="tab" id="vOpe" aria-selected="false">Operador (computador)</button>
+  </div>
+
+  <div class="stage" id="stage">
+    <!-- CELULAR -->
+    <div class="phone" id="phone">
+      <div class="ph-top"><b id="phTitle">Água em Foco</b><span class="hint num" id="phClock">21:14</span></div>
+      <div class="ph-body" id="phBody"></div>
+      <div class="ph-nav" role="tablist">
+        <button role="tab" data-tab="agora" aria-selected="true">Agora</button>
+        <button role="tab" data-tab="hist" aria-selected="false">Histórico</button>
+        <button role="tab" data-tab="ajuda" aria-selected="false">Ajuda</button>
+      </div>
+    </div>
+
+    <!-- OPERADOR -->
+    <div class="panel" id="panel">
+      <div class="panel-top">
+        <h2>Painel do operador</h2>
+        <div><span class="badge">modo ensaio</span></div>
+      </div>
+      <div class="panel-body">
+        <div class="tiles" id="tiles"></div>
+
+        <div class="sec">
+          <h3>Nível nas últimas 6 h</h3>
+          <div class="chart-box"><div id="opChart"></div></div>
+        </div>
+
+        <div class="sec">
+          <h3>Avisos</h3>
+          <div class="alerts" id="alerts"></div>
+        </div>
+
+        <div class="sec">
+          <h3>Configuração</h3>
+          <form class="cfg" id="cfg">
+            <div class="f"><label for="cH">Altura do sensor H (cm)</label><input type="number" id="cH" value="150" min="20" max="400"></div>
+            <div class="f"><label for="cLim">Limiar demonstrativo (cm)</label><input type="number" id="cLim" value="80" min="1" max="300"></div>
+            <div class="f"><label for="cTo">"Sem atualização" após (min)</label><input type="number" id="cTo" value="15" min="5" max="120"></div>
+            <div class="f"><label for="cWhy">Motivo da alteração *</label><input type="text" id="cWhy" placeholder="ex.: recalibração após visita"></div>
+            <div class="f" style="justify-content:flex-end"><label>&nbsp;</label><button class="btn pri" type="submit">Salvar alterações</button></div>
+          </form>
+          <div class="cfg-foot" style="margin-top:10px"><span id="cfgMsg">Toda alteração exige motivo e fica registrada.</span></div>
+          <div class="log" id="log" style="margin-top:10px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="note">Protótipo acadêmico. Os valores são fictícios e gerados pelo simulador acima; o limiar é demonstrativo e não indica risco real. A ferramenta não substitui a Defesa Civil nem os serviços oficiais de alerta.</p>
+</div>
+
+<script>
+(function(){
+  var S={H:150,lim:80,timeout:15,level:42,sensorOn:true,playing:true,t:0,readings:[],alerts:[],log:[],range:6,tab:"agora",view:"mor",nextId:1};
+  var START=21*60+14-6*60; // minutos do dia no início da janela
+  function fmt(min){min=((min%1440)+1440)%1440;var h=Math.floor(min/60),m=min%60;return (h<10?"0":"")+h+":"+(m<10?"0":"")+m;}
+  // histórico inicial: 6 h a cada 5 min, subindo suavemente até o nível atual
+  (function seed(){
+    var n=72;
+    for(var i=0;i<n;i++){
+      var p=i/(n-1), base=18+ (S.level-18)*Math.pow(p,1.6);
+      var v=Math.max(0,Math.round(base+Math.sin(i/4)*1.6));
+      var gap=(i>=28&&i<=35); // trecho sem dados, como no wireframe
+      S.readings.push({t:START+i*5, v:gap?null:v, ok:!gap});
+    }
+    S.t=START+(n-1)*5;
+  })();
+
+  function last(){for(var i=S.readings.length-1;i>=0;i--){if(S.readings[i].v!==null)return S.readings[i];}return null;}
+  function minutesSince(){var l=last();return l?S.t-l.t:999;}
+  function stale(){return minutesSince()>=S.timeout;}
+  function status(){ if(stale())return "stale"; return last().v>=S.lim?"crit":"ok"; }
+
+  function pushAlert(type,title,msg){
+    S.alerts.unshift({id:S.nextId++,type:type,title:title,msg:msg,t:S.t,ack:false,closed:false,reason:""});
+    if(S.alerts.length>8)S.alerts.pop();
+  }
+
+  var wasCrit=false, wasStale=false;
+  function tick(){
+    S.t+=5;
+    if(S.sensorOn){
+      var target=S.level, l=last(), prev=l?l.v:target;
+      var v=Math.max(0,Math.round(prev+(target-prev)*0.45+(Math.random()*2-1)));
+      S.readings.push({t:S.t,v:v,ok:true});
+    } else {
+      S.readings.push({t:S.t,v:null,ok:false});
+    }
+    while(S.readings.length>120)S.readings.shift();
+    var st=status();
+    if(st==="crit"&&!wasCrit)pushAlert("crit","Limiar atingido","Leitura válida de "+last().v+" cm, acima do limiar de "+S.lim+" cm.");
+    if(st==="stale"&&!wasStale)pushAlert("stale","Sem atualização","Nenhuma leitura há "+minutesSince()+" min. Última medição: "+last().v+" cm às "+fmt(last().t)+".");
+    wasCrit=st==="crit"; wasStale=st==="stale";
+    render();
+  }
+
+  /* ---------- gráfico ---------- */
+  function chart(w,h,hours,showAxis){
+    var from=S.t-hours*60;
+    var pts=S.readings.filter(function(r){return r.t>=from;});
+    if(!pts.length)return "";
+    var maxV=Math.max(S.lim*1.25,20);
+    pts.forEach(function(r){if(r.v!==null&&r.v>maxV)maxV=r.v*1.1;});
+    var padL=showAxis?30:4,padR=6,padT=10,padB=showAxis?18:4;
+    var iw=w-padL-padR, ih=h-padT-padB;
+    function X(t){return padL+(t-from)/(hours*60)*iw;}
+    function Y(v){return padT+ih-(v/maxV)*ih;}
+    var segs=[],cur=[],gaps=[],gapStart=null;
+    pts.forEach(function(r){
+      if(r.v===null){ if(cur.length){segs.push(cur);cur=[];} if(gapStart===null)gapStart=r.t; }
+      else { if(gapStart!==null){gaps.push([gapStart,r.t]);gapStart=null;} cur.push(r); }
+    });
+    if(cur.length)segs.push(cur);
+    if(gapStart!==null)gaps.push([gapStart,S.t]);
+    var s='<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="Nível da água ao longo do tempo">';
+    s+='<defs><pattern id="hatch" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="none"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--line-strong)" stroke-width="2"/></pattern></defs>';
+    gaps.forEach(function(g){s+='<rect x="'+X(g[0]).toFixed(1)+'" y="'+padT+'" width="'+Math.max(1,(X(g[1])-X(g[0]))).toFixed(1)+'" height="'+ih+'" fill="url(#hatch)" opacity=".55"/>';});
+    s+='<line x1="'+padL+'" y1="'+Y(S.lim).toFixed(1)+'" x2="'+(w-padR)+'" y2="'+Y(S.lim).toFixed(1)+'" stroke="var(--crit)" stroke-width="1.5" stroke-dasharray="5 4"/>';
+    s+='<text x="'+(w-padR)+'" y="'+(Y(S.lim)-5).toFixed(1)+'" text-anchor="end" font-size="10" fill="var(--crit)" font-family="var(--font-m)">limiar '+S.lim+' cm</text>';
+    segs.forEach(function(seg){
+      if(seg.length<2)return;
+      var d=seg.map(function(r,i){return (i?"L":"M")+X(r.t).toFixed(1)+" "+Y(r.v).toFixed(1);}).join(" ");
+      var area=d+" L"+X(seg[seg.length-1].t).toFixed(1)+" "+(padT+ih)+" L"+X(seg[0].t).toFixed(1)+" "+(padT+ih)+" Z";
+      s+='<path d="'+area+'" fill="var(--accent)" opacity=".13"/>';
+      s+='<path d="'+d+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    });
+    var l=last();
+    if(l&&l.t>=from&&!stale())s+='<circle cx="'+X(l.t).toFixed(1)+'" cy="'+Y(l.v).toFixed(1)+'" r="3.5" fill="var(--accent)" stroke="var(--surface-2)" stroke-width="2"/>';
+    if(showAxis){
+      [0,Math.round(maxV/2),Math.round(maxV)].forEach(function(v){
+        s+='<text x="'+(padL-6)+'" y="'+(Y(v)+3.5).toFixed(1)+'" text-anchor="end" font-size="10" fill="var(--muted)" font-family="var(--font-m)">'+v+'</text>';
+      });
+      for(var k=0;k<=hours;k+=Math.max(1,Math.round(hours/4))){
+        var t=from+k*60;
+        s+='<text x="'+X(t).toFixed(1)+'" y="'+(h-4)+'" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--font-m)">'+fmt(t)+'</text>';
+      }
+    }
+    return s+'</svg>';
+  }
+
+  /* ---------- celular ---------- */
+  function phone(){
+    var b=document.getElementById("phBody"), st=status(), l=last();
+    document.getElementById("phClock").textContent=fmt(S.t);
+    document.getElementById("phTitle").textContent=S.tab==="hist"?"Histórico":S.tab==="ajuda"?"Ajuda":"Água em Foco";
+    var banner='<div class="banner"><span aria-hidden="true">⚠</span><span>Informação <b>experimental</b>, de um único ponto. Não substitui a Defesa Civil.</span></div>';
+    if(S.tab==="agora"){
+      var box;
+      if(st==="stale"){
+        box='<div class="state s-stale"><div class="lbl">Sem atualização</div>'+
+            '<div class="val">'+(l?l.v+" cm":"--")+'</div>'+
+            '<div class="sub">Última medição às '+(l?fmt(l.t):"--")+', há '+minutesSince()+' min. Este valor é antigo e não descreve a situação agora.</div></div>';
+      } else if(st==="crit"){
+        box='<div class="state s-crit"><div class="lbl">Limiar atingido</div><div class="val">'+l.v+' cm</div>'+
+            '<div class="sub">Medição das '+fmt(l.t)+'. Acima do limiar demonstrativo de '+S.lim+' cm.</div></div>';
+      } else {
+        box='<div class="state s-ok"><div class="lbl">Abaixo do limiar</div><div class="val">'+l.v+' cm</div>'+
+            '<div class="sub">Medição das '+fmt(l.t)+'. Abaixo do limiar não significa local seguro.</div></div>';
+      }
+      var sOk=S.sensorOn&&!stale();
+      b.innerHTML=banner+box+
+        '<div class="row"><span><span class="dot" style="background:'+(sOk?"var(--ok)":"var(--stale)")+'"></span>Sensor</span><b>'+(sOk?"enviando leituras":"sem sinal")+'</b></div>'+
+        '<div class="mini"><button data-goto="hist" aria-label="Abrir histórico">'+chart(282,96,6,false)+'</button>'+
+        '<div class="hint" style="margin-top:6px">Últimas 6 h · toque para ver o histórico</div></div>'+
+        '<div class="hint">Ponto monitorado: Rua Exemplo, 120 · acesso por QR code.</div>';
+    } else if(S.tab==="hist"){
+      b.innerHTML='<div class="seg-time">'+[6,24,168].map(function(h,i){
+          var lbl=["6h","24h","7d"][i];
+          return '<button data-range="'+h+'" aria-pressed="'+(S.range===h)+'">'+lbl+'</button>';}).join("")+'</div>'+
+        '<div class="mini">'+chart(282,170,S.range,true)+'</div>'+
+        '<div class="legend"><span><i></i>nível medido</span><span><i class="dash"></i>limiar demonstrativo</span><span><i class="gap"></i>sem dados</span></div>'+
+        '<div class="hint">Os trechos hachurados são períodos sem leitura. Falha de comunicação nunca aparece como nível zero.</div>'+
+        banner;
+    } else {
+      b.innerHTML='<div class="help">'+
+        '<h4>O que é medido</h4><p>Um sensor instalado acima de uma referência fixa mede a distância até a água. O nível mostrado é h = H − d, ou seja, a altura da água em relação a essa referência. Não é a profundidade na rua nem a cota de inundação do bairro.</p>'+
+        '<h4>Rótulos</h4>'+
+        '<p><span class="tag" style="color:var(--ok);border-color:var(--ok)">Abaixo do limiar</span> a última leitura válida ficou abaixo do valor configurado. Não é garantia de segurança.</p>'+
+        '<p><span class="tag" style="color:var(--crit);border-color:var(--crit)">Limiar atingido</span> a leitura passou do limiar demonstrativo. Serve para ensaio, não indica risco real.</p>'+
+        '<p><span class="tag" style="color:var(--stale);border-color:var(--stale)">Sem atualização</span> o sensor parou de enviar dados. O último valor fica marcado como antigo.</p>'+
+        '<h4 style="margin-top:12px">Emergência</h4></div>'+
+        '<div class="call"><span>Defesa Civil</span><span class="num">199</span></div>'+
+        '<div class="call"><span>Bombeiros</span><span class="num">193</span></div>'+
+        '<div class="hint">Estes são os canais oficiais. O Água em Foco é um projeto acadêmico e não emite alertas oficiais.</div>';
+    }
+  }
+
+  /* ---------- painel ---------- */
+  function panel(){
+    var st=status(),l=last(),sOk=S.sensorOn&&!stale();
+    document.getElementById("tiles").innerHTML=
+      tile("Nível atual", st==="stale"?"sem dado":l.v+" cm", st==="stale"?"última: "+l.v+" cm às "+fmt(l.t):"às "+fmt(l.t), st==="crit")+
+      tile("Sensor", sOk?"enviando":"sem sinal", "última leitura há "+minutesSince()+" min", !sOk)+
+      tile("Qualidade", st==="stale"?"dado antigo":"dentro da faixa", "faixa calibrada 0 a "+S.H+" cm", st==="stale")+
+      tile("Avisos abertos", String(S.alerts.filter(function(a){return !a.closed;}).length), "limiar "+S.lim+" cm · timeout "+S.timeout+" min", false);
+    document.getElementById("opChart").innerHTML=chart(760,220,6,true);
+    var open=S.alerts.filter(function(a){return !a.closed;});
+    document.getElementById("alerts").innerHTML= open.length? open.map(function(a){
+      return '<div class="alert-item lv-'+a.type+'"><div><div class="t">'+a.title+' <span class="hint num">'+fmt(a.t)+'</span></div>'+
+        '<div class="m">'+a.msg+(a.ack?' · confirmado pelo operador':'')+'</div></div>'+
+        '<div class="acts"><button class="btn" data-ack="'+a.id+'"'+(a.ack?" disabled":"")+'>Confirmar</button>'+
+        '<button class="btn" data-close="'+a.id+'"'+(a.ack?"":" disabled")+'>Encerrar</button></div></div>';
+    }).join("") : '<div class="empty">Nenhum aviso aberto. Mova o nível acima do limiar ou desligue o sensor no simulador para gerar um.</div>';
+    document.getElementById("log").innerHTML=S.log.length?S.log.map(function(e){return '<div><span class="num">'+fmt(e.t)+'</span> · '+e.txt+'</div>';}).join(""):'<div>Nenhuma alteração registrada ainda.</div>';
+  }
+  function tile(k,v,d,alert){return '<div class="tile'+(alert?" alert":"")+'"><div class="k">'+k+'</div><div class="v">'+v+'</div><div class="d">'+d+'</div></div>';}
+
+  function render(){ document.getElementById("lvlOut").textContent=S.level; phone(); panel(); }
+
+  /* ---------- eventos ---------- */
+  document.getElementById("lvl").addEventListener("input",function(e){S.level=+e.target.value;render();});
+  function sensor(on){S.sensorOn=on;document.getElementById("bOk").setAttribute("aria-pressed",String(on));document.getElementById("bOff").setAttribute("aria-pressed",String(!on));render();}
+  document.getElementById("bOk").onclick=function(){sensor(true);};
+  document.getElementById("bOff").onclick=function(){sensor(false);};
+  document.getElementById("bStep").onclick=function(){tick();};
+  var timer=null;
+  function play(on){S.playing=on;document.getElementById("bPlay").setAttribute("aria-pressed",String(on));document.getElementById("bPlay").textContent=on?"Rodando":"Pausado";
+    if(timer){clearInterval(timer);timer=null;} if(on)timer=setInterval(tick,2200);}
+  document.getElementById("bPlay").onclick=function(){play(!S.playing);};
+  document.getElementById("bTheme").onclick=function(){
+    var r=document.documentElement, dark=r.getAttribute("data-theme")==="dark"||(!r.getAttribute("data-theme")&&matchMedia("(prefers-color-scheme:dark)").matches);
+    r.setAttribute("data-theme",dark?"light":"dark");};
+
+  document.querySelector(".ph-nav").addEventListener("click",function(e){
+    var b=e.target.closest("button[data-tab]"); if(!b)return;
+    S.tab=b.dataset.tab;
+    this.querySelectorAll("button").forEach(function(x){x.setAttribute("aria-selected",String(x.dataset.tab===S.tab));});
+    phone();});
+  document.getElementById("phBody").addEventListener("click",function(e){
+    var g=e.target.closest("[data-goto]"), r=e.target.closest("[data-range]");
+    if(g){S.tab=g.dataset.goto;document.querySelectorAll(".ph-nav button").forEach(function(x){x.setAttribute("aria-selected",String(x.dataset.tab===S.tab));});phone();}
+    if(r){S.range=+r.dataset.range;phone();}});
+
+  document.getElementById("alerts").addEventListener("click",function(e){
+    var a=e.target.closest("[data-ack]"), c=e.target.closest("[data-close]");
+    if(a){var it=S.alerts.find(function(x){return x.id==a.dataset.ack;}); if(it){it.ack=true;S.log.unshift({t:S.t,txt:'Aviso "'+it.title+'" confirmado (visto, evento segue aberto).'});}}
+    if(c){var it2=S.alerts.find(function(x){return x.id==c.dataset.close;}); if(it2){it2.closed=true;S.log.unshift({t:S.t,txt:'Aviso "'+it2.title+'" encerrado após verificação.'});}}
+    panel();});
+
+  document.getElementById("cfg").addEventListener("submit",function(e){
+    e.preventDefault();
+    var why=document.getElementById("cWhy").value.trim(), msg=document.getElementById("cfgMsg");
+    if(!why){msg.textContent="Informe o motivo da alteração para salvar.";msg.style.color="var(--crit)";document.getElementById("cWhy").focus();return;}
+    var oldL=S.lim,oldH=S.H,oldT=S.timeout;
+    S.H=+document.getElementById("cH").value; S.lim=+document.getElementById("cLim").value; S.timeout=+document.getElementById("cTo").value;
+    var ch=[]; if(oldH!==S.H)ch.push("H "+oldH+"→"+S.H+" cm"); if(oldL!==S.lim)ch.push("limiar "+oldL+"→"+S.lim+" cm"); if(oldT!==S.timeout)ch.push("timeout "+oldT+"→"+S.timeout+" min");
+    S.log.unshift({t:S.t,txt:(ch.length?ch.join(", "):"nenhum valor alterado")+" · motivo: "+why});
+    document.getElementById("cWhy").value="";
+    msg.textContent="Alteração registrada às "+fmt(S.t)+"."; msg.style.color="var(--ok)";
+    wasCrit=false; render();});
+
+  var vm=document.getElementById("vMor"), vo=document.getElementById("vOpe");
+  function view(v){S.view=v;vm.setAttribute("aria-selected",String(v==="mor"));vo.setAttribute("aria-selected",String(v==="ope"));
+    var wide=matchMedia("(min-width:1000px)").matches;
+    document.getElementById("phone").hidden=!wide&&v!=="mor";
+    document.getElementById("panel").hidden=!wide&&v!=="ope";}
+  vm.onclick=function(){view("mor");}; vo.onclick=function(){view("ope");};
+  matchMedia("(min-width:1000px)").addEventListener("change",function(){view(S.view);});
+
+  view("mor"); play(true); render();
+})();
+</script>
+
+</body></html>
